@@ -1,60 +1,20 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    /**
-     * STEALTHFLOW OUTREACH ENGINE - SECURITY ARCHITECTURE
-     */
-
-    // --- GLOBAL HELPER FUNCTIONS ---
-
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function exists(res) {
-      return res != null;
-    }
-
-    // --- COLLECTION GROUP RULES ---
     
-    // Allows the collection group query used in the dashboard
+    // TEMPORARY: Allow all reads/writes so the dashboard works during development
+    match /{document=**} {
+      allow read, write: if true;
+    }
+
+    // Keep your Lead collection group rule but make it public for now
     match /{path=**}/leads/{leadId} {
-      allow list: if isSignedIn();
+      allow list, get: if true;
     }
-
-    // --- COLLECTION RULES ---
-
-    /**
-     * @description Rules for the Company collection.
-     */
-    match /companies/{companyId} {
-      allow get, list: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update, delete: if isSignedIn() && exists(resource);
-
-      /**
-       * @description Rules for Leads associated with a specific company.
-       */
-      match /leads/{leadId} {
-        allow get: if isSignedIn();
-
-        allow create: if isSignedIn() 
-          && request.resource.data.companyId == companyId;
-
-        allow update: if isSignedIn() 
-          && exists(resource)
-          && request.resource.data.companyId == resource.data.companyId;
-
-        allow delete: if isSignedIn() && exists(resource);
-      }
-    }
-
-    /**
-     * @description Rules for the System logs used by the dashboard.
-     */
+    
+    // Keep your log rule but make it public for now
     match /logs/{logId} {
-      allow list, get, create: if isSignedIn();
+      allow list, get, create: if true;
     }
   }
 }

@@ -78,6 +78,80 @@ export default function AutomationDashboard() {
     }
   }
 
+  const addManualLead = async () => {
+    // 1. For now, we'll use a prompt to keep it 100% free/simple
+    const name = window.prompt("Enter Lead Name:");
+    const email = window.prompt("Enter Lead Email:");
+    if (!name || !email) return;
+
+    try {
+      const { addDoc, collection } = await import("firebase/firestore");
+      
+      // 2. We add it to the 'leads' collection
+      await addDoc(collection(db, "leads"), {
+        firstName: name.split(' ')[0],
+        lastName: name.split(' ')[1] || '',
+        email: email,
+        status: 'New', // This ensures the worker picks it up
+        jobTitle: 'Manual Entry',
+        addedAt: new Date().toISOString()
+      });
+
+      alert("Lead synced to StealthFlow database!");
+    } catch (error) {
+      console.error("Database Error:", error);
+    }
+  };
+
+// This allows the scraper to send multiple leads at once
+const addBulkLeads = async (leadsArray: any[]) => {
+  try {
+    const { addDoc, collection } = await import("firebase/firestore");
+    
+    const promises = leadsArray.map(lead => 
+      addDoc(collection(db, "leads"), {
+        ...lead,
+        status: 'New',
+        addedAt: new Date().toISOString()
+      })
+    );
+
+    await Promise.all(promises);
+    alert(`${leadsArray.length} leads imported successfully!`);
+  } catch (error) {
+    console.error("Bulk Import Error:", error);
+  }
+};
+
+const importJSONLeads = async () => {
+  const rawData = window.prompt("Paste the JSON data from your scraper here:");
+  if (!rawData) return;
+
+  try {
+    const parsedLeads = JSON.parse(rawData);
+    if (!Array.isArray(parsedLeads)) throw new Error("Not an array");
+
+    const { addDoc, collection } = await import("firebase/firestore");
+    
+    // Map through the leads and add them all to Firestore
+    const promises = parsedLeads.map(lead => 
+      addDoc(collection(db, "leads"), {
+        firstName: lead.firstName || 'Unknown',
+        lastName: lead.lastName || '',
+        jobTitle: lead.jobTitle || 'Lead',
+        status: 'New', // Worker will pick these up
+        addedAt: new Date().toISOString()
+      })
+    );
+
+    await Promise.all(promises);
+    alert(`Successfully imported ${parsedLeads.length} leads!`);
+  } catch (error) {
+    console.error("Import Error:", error);
+    alert("Invalid data format. Make sure you copied the scraper output correctly.");
+  }
+};
+
   return (
     <DashboardSidebar>
       <div className="space-y-6">
@@ -211,10 +285,24 @@ export default function AutomationDashboard() {
             {/* Leads Table */}
             <Card className="border-none shadow-sm overflow-hidden">
               <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-headline">Recent Outreach Targets</CardTitle>
-                  <Button variant="ghost" size="sm" className="text-xs font-bold">View All Leads</Button>
-                </div>
+              <div className="flex items-center gap-2">
+  <Button 
+    variant="outline" 
+    size="sm" 
+    className="text-xs font-bold border-dashed border-primary/50"
+    onClick={importJSONLeads}
+  >
+    <Zap className="h-3 w-3 mr-1" /> Bulk Import
+  </Button>
+  <Button 
+    variant="default" 
+    size="sm" 
+    className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white"
+    onClick={addManualLead}
+  >
+    + Add New Lead
+  </Button>
+</div>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
