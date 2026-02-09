@@ -4,72 +4,40 @@ service cloud.firestore {
 
     /**
      * STEALTHFLOW OUTREACH ENGINE - SECURITY ARCHITECTURE
-     *
-     * Core Philosophy:
-     * This ruleset implements a robust authentication-gated model for an outreach management system.
-     * While in prototyping mode, the focus is on securing relational integrity and ensuring 
-     * that only authenticated users can access the engine's data.
-     *
-     * Data Structure:
-     * The system uses a hierarchical model: /companies/{companyId} -> /leads/{leadId}.
-     * This mirrors the 1:N relationship between a target organization and its individual contacts.
-     *
-     * Key Security Decisions:
-     * 1. Authentication Gate: All data is restricted to authenticated users. No public access is allowed.
-     * 2. Path Consistency: Rules strictly enforce that sub-resources (Leads) must internally 
-     *    reference their parent (Company) via a denormalized 'companyId' field.
-     * 3. Immutability: Once a lead is assigned to a company, its association is locked to prevent 
-     *    orphaned data or accidental relocation.
-     * 4. State Safety: Destructive operations (update/delete) are guarded by existence checks 
-     *    to prevent execution against non-existent or stale data.
-     *
-     * Denormalization for Authorization:
-     * Each 'Lead' document includes a 'companyId'. This allows rules to validate the relationship 
-     * without performing expensive cross-document lookups (get() calls) to the parent company.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
 
-    /**
-     * @description Checks if the request is made by an authenticated user.
-     */
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description Verifies a document exists before allowing modification.
-     */
     function exists(res) {
       return res != null;
+    }
+
+    // --- COLLECTION GROUP RULES ---
+    
+    // Allows the collection group query used in the dashboard
+    match /{path=**}/leads/{leadId} {
+      allow list: if isSignedIn();
     }
 
     // --- COLLECTION RULES ---
 
     /**
      * @description Rules for the Company collection.
-     * @path /companies/{companyId}
-     * @allow get, list, create, update, delete: if isSignedIn()
-     * @deny (any): if request.auth == null
-     * @principle Restricts outreach targets to authenticated team members only.
      */
     match /companies/{companyId} {
       allow get, list: if isSignedIn();
-      
-      // CRITICAL: Prototyping mode allows authenticated writes. 
-      // TODO: Add specific 'ownerId' or 'teamId' check once user ownership is defined in schema.
       allow create: if isSignedIn();
       allow update, delete: if isSignedIn() && exists(resource);
 
       /**
        * @description Rules for Leads associated with a specific company.
-       * @path /companies/{companyId}/leads/{leadId}
-       * @allow create: if isSignedIn() && request.resource.data.companyId == companyId
-       * @deny create: if internal companyId does not match the path URL.
-       * @principle Enforces relational integrity and path-data consistency.
        */
       match /leads/{leadId} {
-        allow get, list: if isSignedIn();
+        allow get: if isSignedIn();
 
         allow create: if isSignedIn() 
           && request.resource.data.companyId == companyId;
@@ -82,11 +50,11 @@ service cloud.firestore {
       }
     }
 
-    // --- SCHEMA VALIDATION WARNINGS (PROTOTYPING) ---
-    // CRITICAL: The 'Company' and 'Lead' entities currently lack an 'ownerId' or 'creatorId'.
-    // While the rules are secure against unauthenticated users, any signed-in user can 
-    // technically access any company's data. 
-    // TODO: Add an 'ownerId' field to Company/Lead and update rules to use isOwner(resource.data.ownerId).
-
+    /**
+     * @description Rules for the System logs used by the dashboard.
+     */
+    match /logs/{logId} {
+      allow list, get, create: if isSignedIn();
+    }
   }
 }
