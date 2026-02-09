@@ -1,145 +1,245 @@
 
 "use client"
 
+import { useState, useEffect, useMemo, useRef } from "react"
 import { DashboardSidebar } from "@/components/layout/sidebar"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { 
+  Zap, 
+  Terminal, 
+  Activity, 
   Users, 
-  Send, 
-  MessageSquare, 
-  BarChart3, 
-  ArrowUpRight, 
-  Zap,
-  MousePointer2
+  ShieldCheck,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Play,
+  Square
 } from "lucide-react"
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  AreaChart,
-  Area
-} from "recharts"
+import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { collection, query, orderBy, limit, collectionGroup } from "firebase/firestore"
+import { CampaignWorker } from "@/lib/engine/worker"
 
-const stats = [
-  { name: "Total Leads", value: "2,543", icon: Users, change: "+12%", trend: "up" },
-  { name: "Sent Messages", value: "842", icon: Send, change: "+18%", trend: "up" },
-  { name: "Replies Received", value: "124", icon: MessageSquare, change: "+5%", trend: "up" },
-  { name: "Reply Rate", value: "14.7%", icon: BarChart3, change: "+2%", trend: "up" },
-]
+export default function AutomationDashboard() {
+  const db = useFirestore()
+  const [engineActive, setEngineActive] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
-const activityData = [
-  { time: "08:00", active: 12, mimicry: 85 },
-  { time: "10:00", active: 45, mimicry: 92 },
-  { time: "12:00", active: 38, mimicry: 88 },
-  { time: "14:00", active: 65, mimicry: 95 },
-  { time: "16:00", active: 52, mimicry: 91 },
-  { time: "18:00", active: 20, mimicry: 82 },
-]
+  // Memoized queries for real-time data
+  const logsQuery = useMemoFirebase(() => {
+    return query(collection(db, "logs"), orderBy("timestamp", "desc"), limit(50))
+  }, [db])
 
-export default function Dashboard() {
+  const leadsQuery = useMemoFirebase(() => {
+    // Collection group query to get all leads across all companies
+    return query(collectionGroup(db, "leads"), limit(12))
+  }, [db])
+
+  const { data: logs } = useCollection(logsQuery)
+  const { data: leads } = useCollection(leadsQuery)
+
+  // Sync scroll for the console
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0
+    }
+  }, [logs])
+
+  const toggleEngine = () => {
+    const worker = CampaignWorker.getInstance(db)
+    if (engineActive) {
+      worker.stop()
+      setEngineActive(false)
+    } else {
+      worker.start()
+      setEngineActive(true)
+    }
+  }
+
   return (
     <DashboardSidebar>
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-primary font-headline">Welcome back, Commander</h1>
-          <p className="text-muted-foreground mt-1 text-lg">Your stealth engine is currently optimizing outreach variations.</p>
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 rounded-2xl shadow-sm border border-border/50">
+          <div className="flex items-center gap-4">
+            <div className={`p-3 rounded-xl ${engineActive ? 'bg-secondary/20 animate-pulse' : 'bg-muted'}`}>
+              <Zap className={`h-8 w-8 ${engineActive ? 'text-secondary fill-secondary' : 'text-muted-foreground'}`} />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight text-primary font-headline">Automation Command Center</h1>
+              <p className="text-muted-foreground text-sm flex items-center gap-2">
+                {engineActive ? (
+                  <span className="flex items-center gap-1.5 text-secondary font-medium">
+                    <span className="h-2 w-2 rounded-full bg-secondary" />
+                    Engine Active: Human Mimicry Gaussian Mode
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+                    Engine Standby
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-6 px-6 py-3 bg-muted/30 rounded-2xl border border-border/50">
+            <div className="flex flex-col items-center">
+              <div className="flex items-center gap-2 mb-1">
+                <ShieldCheck className={`h-4 w-4 ${engineActive ? 'text-green-500' : 'text-muted-foreground'}`} />
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Account Health</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className={`h-1.5 w-6 rounded-full ${engineActive ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-muted-foreground/30'}`} />
+                ))}
+              </div>
+            </div>
+            <div className="h-10 w-px bg-border" />
+            <div className="flex items-center gap-4">
+              <Label htmlFor="engine-switch" className="text-sm font-bold uppercase tracking-wider text-primary">Master Switch</Label>
+              <Switch 
+                id="engine-switch" 
+                checked={engineActive} 
+                onCheckedChange={toggleEngine}
+                className="data-[state=checked]:bg-secondary"
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.name} className="border-none shadow-sm overflow-hidden group hover:ring-1 hover:ring-secondary transition-all">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{stat.name}</CardTitle>
-                <stat.icon className="h-4 w-4 text-secondary" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {leads?.map((lead) => (
+                <Card key={lead.id} className="border-none shadow-sm hover:ring-1 hover:ring-secondary/30 transition-all bg-white overflow-hidden group">
+                  <div className={`h-1 w-full ${
+                    lead.status === 'Contacted' ? 'bg-green-500' : 
+                    lead.status === 'New' ? 'bg-secondary' : 'bg-muted'
+                  }`} />
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-full bg-primary/5 flex items-center justify-center text-primary font-bold">
+                      {lead.firstName[0]}{lead.lastName[0]}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-primary truncate leading-tight">{lead.firstName} {lead.lastName}</h4>
+                      <p className="text-xs text-muted-foreground truncate">{lead.jobTitle}</p>
+                    </div>
+                    <Badge variant={
+                      lead.status === 'Contacted' ? 'default' : 
+                      lead.status === 'New' ? 'secondary' : 'outline'
+                    } className="text-[10px] uppercase font-bold px-2 py-0">
+                      {lead.status}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              ))}
+              {!leads?.length && [1,2,3,4].map(i => (
+                <div key={i} className="h-20 bg-muted/20 animate-pulse rounded-xl" />
+              ))}
+            </div>
+
+            <Card className="border-none shadow-sm bg-[#0a0c10] text-green-400 overflow-hidden">
+              <CardHeader className="border-b border-green-900/30 py-3 bg-[#11141b]">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Terminal className="h-4 w-4" />
+                    <span className="text-xs font-mono font-bold uppercase tracking-widest">Real-time Activity Console</span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <div className="h-2 w-2 rounded-full bg-red-500/50" />
+                    <div className="h-2 w-2 rounded-full bg-yellow-500/50" />
+                    <div className="h-2 w-2 rounded-full bg-green-500/50" />
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold font-headline">{stat.value}</div>
-                <p className="text-xs text-green-600 flex items-center mt-1">
-                  <ArrowUpRight className="h-3 w-3 mr-1" />
-                  {stat.change} from last month
-                </p>
+              <CardContent className="p-0">
+                <ScrollArea className="h-[300px] w-full p-4 font-mono text-sm" ref={scrollRef}>
+                  <div className="space-y-1.5">
+                    {logs?.map((log) => (
+                      <div key={log.id} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                        <span className="text-muted-foreground/50 shrink-0">
+                          {log.timestamp?.toDate ? log.timestamp.toDate().toLocaleTimeString() : '...'}
+                        </span>
+                        <span className={`
+                          ${log.type === 'success' ? 'text-green-400' : ''}
+                          ${log.type === 'error' ? 'text-red-400 font-bold' : ''}
+                          ${log.type === 'warning' ? 'text-yellow-400' : ''}
+                          ${log.type === 'jitter' ? 'text-blue-400 italic' : ''}
+                          ${log.type === 'info' ? 'text-gray-300' : ''}
+                        `}>
+                          {log.message}
+                        </span>
+                      </div>
+                    ))}
+                    {!logs?.length && <div className="text-muted-foreground italic">Waiting for engine activity...</div>}
+                  </div>
+                </ScrollArea>
               </CardContent>
             </Card>
-          ))}
-        </div>
+          </div>
 
-        <div className="grid gap-6 md:grid-cols-7">
-          <Card className="md:col-span-4 border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="font-headline">Engine Activity</CardTitle>
-              <CardDescription>Human-mimicry performance (Gaussian Jitter Consistency)</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-[300px] w-full mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={activityData}>
-                    <defs>
-                      <linearGradient id="colorActive" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                      </linearGradient>
-                      <linearGradient id="colorMimicry" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--secondary))" stopOpacity={0.1}/>
-                        <stop offset="95%" stopColor="hsl(var(--secondary))" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="time" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                    />
-                    <Area type="monotone" dataKey="active" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorActive)" strokeWidth={3} />
-                    <Area type="monotone" dataKey="mimicry" stroke="hsl(var(--secondary))" fillOpacity={1} fill="url(#colorMimicry)" strokeWidth={3} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="md:col-span-3 border-none shadow-sm">
-            <CardHeader>
-              <CardTitle className="font-headline">Live Browser Nodes</CardTitle>
-              <CardDescription>Playwright initialization status</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {[
-                { label: "Worker Node Alpha", status: "Running", progress: 85, color: "bg-green-500" },
-                { label: "Worker Node Beta", status: "Idle", progress: 100, color: "bg-primary" },
-                { label: "Worker Node Gamma", status: "Human Mimicry Phase", progress: 42, color: "bg-secondary" },
-              ].map((node) => (
-                <div key={node.label} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className={`h-2 w-2 rounded-full ${node.color}`} />
-                      <span className="font-medium">{node.label}</span>
+          <div className="space-y-6">
+            <Card className="border-none shadow-sm bg-primary text-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-headline flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold uppercase tracking-wider opacity-80">
+                    <span>Target Saturation</span>
+                    <span>{engineActive ? '84%' : '0%'}</span>
+                  </div>
+                  <Progress value={engineActive ? 84 : 0} className="h-1.5 bg-white/20" />
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs font-bold uppercase tracking-wider opacity-80">
+                    <span>Jitter Efficiency</span>
+                    <span>{engineActive ? '99.2%' : '0%'}</span>
+                  </div>
+                  <Progress value={engineActive ? 99 : 0} className="h-1.5 bg-white/20" />
+                </div>
+                <div className="pt-2">
+                  <div className="bg-white/10 rounded-xl p-3 border border-white/10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Clock className="h-3 w-3" />
+                      <span className="text-[10px] font-bold uppercase">Estimated Completion</span>
                     </div>
-                    <span className="text-muted-foreground">{node.status}</span>
-                  </div>
-                  <Progress value={node.progress} className="h-2" />
-                </div>
-              ))}
-              
-              <div className="pt-4 mt-4 border-t border-dashed">
-                <div className="bg-primary/5 rounded-xl p-4 flex items-start gap-4">
-                  <div className="bg-primary/10 p-2 rounded-lg">
-                    <MousePointer2 className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-sm">Action Jitter: Gaussian Active</h4>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Current mean delay: 4.5s. Standard deviation: 1.2s. Browser behavior is indistinguishable from human input.
-                    </p>
+                    <p className="text-lg font-headline">2h 45m</p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-sm">
+              <CardHeader>
+                <CardTitle className="text-lg font-headline">Safety Protocols</CardTitle>
+                <CardDescription>Engine-level defense mechanisms</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { name: "Browser Fingerprinting", status: "Protected", icon: ShieldCheck, color: "text-green-500" },
+                  { name: "Gaussian Jitter", status: engineActive ? "Active" : "Standby", icon: Activity, color: engineActive ? "text-secondary" : "text-muted-foreground" },
+                  { name: "Proxy Rotation", status: "Enabled", icon: CheckCircle2, color: "text-green-500" },
+                ].map((item) => (
+                  <div key={item.name} className="flex items-center justify-between p-3 rounded-xl bg-muted/30 border border-border/50">
+                    <div className="flex items-center gap-3">
+                      <item.icon className={`h-5 w-5 ${item.color}`} />
+                      <span className="text-sm font-semibold">{item.name}</span>
+                    </div>
+                    <span className="text-xs font-bold uppercase tracking-tighter opacity-70">{item.status}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </DashboardSidebar>

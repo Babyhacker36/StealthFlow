@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "Company": {
@@ -83,6 +84,29 @@
         "lastName",
         "email"
       ]
+    },
+    "SystemLog": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SystemLog",
+      "type": "object",
+      "description": "Real-time activity logs from the automation engine.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "message": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["info", "success", "warning", "error", "jitter"]
+        }
+      },
+      "required": ["timestamp", "message", "type"]
     }
   },
   "auth": {
@@ -100,13 +124,7 @@
           "schema": {
             "$ref": "#/backend/entities/Company"
           },
-          "description": "Stores company data. Each company has a unique ID.",
-          "params": [
-            {
-              "name": "companyId",
-              "description": "The unique identifier of the company."
-            }
-          ]
+          "description": "Stores company data."
         }
       },
       {
@@ -116,20 +134,19 @@
           "schema": {
             "$ref": "#/backend/entities/Lead"
           },
-          "description": "Stores lead data associated with a specific company. Includes denormalized 'companyId' for authorization independence.",
-          "params": [
-            {
-              "name": "companyId",
-              "description": "The unique identifier of the company this lead is associated with."
-            },
-            {
-              "name": "leadId",
-              "description": "The unique identifier of the lead."
-            }
-          ]
+          "description": "Stores lead data associated with a specific company."
+        }
+      },
+      {
+        "path": "/logs/{logId}",
+        "definition": {
+          "entityName": "SystemLog",
+          "schema": {
+            "$ref": "#/backend/entities/SystemLog"
+          },
+          "description": "Stores real-time system logs for dashboard streaming."
         }
       }
-    ],
-    "reasoning": "The Firestore structure is designed to manage company and lead data for the StealthFlow outreach engine. It follows a hierarchical structure to represent the relationship between companies and their associated leads. This structure facilitates efficient querying and data management, while also adhering to the principle of authorization independence by avoiding complex hierarchical dependencies in security rules. Specifically, the 'companyId' field is stored within each lead document, ensuring that access control for leads can be determined directly without needing to retrieve the parent company document.\n\n*   `/companies/{companyId}`: Stores company information.\n*   `/companies/{companyId}/leads/{leadId}`: Stores lead information associated with a specific company. The 'companyId' is denormalized into each lead document within the leads subcollection. This denormalization is crucial for authorization independence, as it allows security rules to validate lead access based on the presence of the 'companyId' without requiring a `get()` call to the parent company document.  This also directly supports QAPs, enabling secure list operations on leads based on the company they belong to.\n\nThe design facilitates straightforward security rules, with path-based access control for companies and the denormalized `companyId` enabling secure access control for leads. This structure directly addresses the authorization independence principle, avoiding hierarchical authorization dependencies. This also promotes scalability, as security checks are localized to each document, improving query performance."
+    ]
   }
 }
