@@ -40,7 +40,9 @@ import {
   DialogFooter
 } from "@/components/ui/dialog"
 import { generatePersonalizedOutreachMessage } from "@/ai/flows/generate-personalized-outreach-message"
-
+// Add these at the top of src/app/leads/page.tsx
+import { db } from "@/firebase" // Double check if your config is in src/lib/firebase.ts instead
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 const initialLeads = [
   { id: 1, name: "Sarah Jenkins", role: "VP of Engineering", company: "TechFlow", university: "Stanford", status: "Contacted", lastActive: "2h ago" },
   { id: 2, name: "Mark Wilson", role: "CTO", company: "CyberShield", university: "MIT", status: "Engaged", lastActive: "15m ago" },
@@ -81,9 +83,29 @@ export default function LeadsPage() {
             <Button variant="outline" size="sm" className="gap-2">
               <Filter className="h-4 w-4" /> Filter
             </Button>
-            <Button size="sm" className="bg-secondary hover:bg-secondary/90 text-white gap-2">
-              Add Leads
-            </Button>
+            <Button 
+  size="sm" 
+  className="bg-secondary hover:bg-secondary/90 text-white gap-2"
+  onClick={async () => {
+    try {
+      console.log("Attempting to add lead...");
+      await addDoc(collection(db, "leads"), {
+        name: "Demo Prospect",
+        role: "Target",
+        company: "Example Corp",
+        status: "pending", 
+        url: "https://www.google.com",
+        createdAt: serverTimestamp()
+      });
+      alert("Success! Lead sent to Firebase. You can now run the worker.");
+    } catch (error) {
+      console.error("Firebase Error:", error);
+      alert("Error! Make sure your .env.local keys are correct.");
+    }
+  }}
+>
+  Add Leads
+</Button>
           </div>
         </div>
 
